@@ -1,6 +1,6 @@
-package org.com.eventsphere.userService.service;
+package org.com.eventsphere.user.service;
 
-import org.com.eventsphere.userService.dto.UserDTO;
+import org.com.eventsphere.user.dto.UserDTO;
 
 import java.util.List;
 

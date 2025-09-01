@@ -1,4 +1,4 @@
-package org.com.eventsphere.userService;
+package org.com.eventsphere.user;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

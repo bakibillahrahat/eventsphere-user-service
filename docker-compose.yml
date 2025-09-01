@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database for User Service
+  postgres:
+    image: postgres:15
+    container_name: user-service-postgres
+    environment:
+      POSTGRES_DB: user-service-postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: mbr101
+      POSTGRES_INITDB_ARGS: '--encoding=UTF-8'
+    ports:
+      - "5432:5432"
+    volumes:
+      - user_postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-user-db.sql:/docker-entrypoint-initdb.d/init-user-db.sql
+    networks:
+      - user-service-network
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isrady -U postgres -d user_service_db']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # Redis (for future session management/caching)
+  redis:
+    image: redis:7-alpine
+    container_name: user-service-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - user-service-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+volumes:
+  user_postgres_data:
+
+networks:
+  user-service-network:
+    driver: bridge

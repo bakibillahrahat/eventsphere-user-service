@@ -1,6 +1,6 @@
-package org.com.eventsphere.userService.repository;
+package org.com.eventsphere.user.repository;
 
-import org.com.eventsphere.userService.entity.User;
+import org.com.eventsphere.user.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;

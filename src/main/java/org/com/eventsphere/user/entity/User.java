@@ -1,4 +1,4 @@
-package org.com.eventsphere.userService.entity;
+package org.com.eventsphere.user.entity;
 
 import jakarta.persistence.*;
 
@@ -10,6 +10,8 @@ public class User {
     private Long id;
     private String email;
     private String password;
-    private String fullName;
+    private String firstName;
+    private String lastName;
+    private String phoneNumber;
     private String role;
 }
