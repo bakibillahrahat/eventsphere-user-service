@@ -1,7 +1,7 @@
 #!/bin/bash
 echo "🚀 Starting User Service Database..."
 
-docker-compose up postgres redis -d
+docker-compose -f ./docker/docker-compose.yml up postgres redis -d
 
 echo "⏳ Waiting for database to be ready..."
 sleep 5

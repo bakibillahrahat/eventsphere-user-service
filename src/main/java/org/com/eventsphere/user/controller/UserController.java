@@ -1,0 +1,51 @@
+package org.com.eventsphere.user.controller;
+
+
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.com.eventsphere.user.dto.UserRegistrationRequest;
+import org.com.eventsphere.user.dto.UserResponse;
+import org.com.eventsphere.user.service.UserService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * UserController
+ * This class acts as the entry point for all user-related API requests.
+ * It is responsible for handling HTTP requests, delegating business logic to the UserService,
+ * and returning an appropriate HTTP response.
+ */
+
+@RestController // 1. Marks this class as a REST controller, which combines @Controller and @ResponseBody.
+@RequestMapping("/api/v1/users") // 2. Sets a base path for all methods in this controller.
+@RequiredArgsConstructor // 3. Injects dependencies (like UserService) via the constructor.
+public class UserController {
+    private static final Logger log = LoggerFactory.getLogger(UserController.class);
+    private final UserService userService;
+
+    /**
+     * API endpoint for registering a new user.
+     * URL: POST http://localhost:8081/api/v1/users/register
+     *
+     * @param request The request body containing user details, mapped to UserRegistrationRequest DTO.
+     * @return An HTTP response with the created user's data and a 201 CREATED status.
+     */
+
+    @PostMapping("/register") // 4. Maps HTTP POST requests to this method.
+    public ResponseEntity<UserResponse> registerUser(@Valid @RequestBody UserRegistrationRequest request) {
+        // 5. The @Valid annotation triggers the validation rules in the UserRegistrationRequest DTO.
+        // 6. The @RequestBody annotation tells Spring to deserialize the incoming JSON body into our DTO.
+        log.info("Received registration request for email: {}", request.getEmail());
+
+        // 7. Delegate the actual business logic to the service layer.
+        UserResponse userResponse = userService.registerUser(request);
+
+        // 8. Return a successful HTTP response (201 CREATED) with the new user's data in the body.
+        return ResponseEntity.status(201).body(userResponse);
+    }
+}

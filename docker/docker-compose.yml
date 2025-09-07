@@ -1,24 +1,24 @@
-version: '3.8'
-
+# The 'version' attribute has been removed as it is obsolete in modern Docker Compose.
 services:
   # PostgreSQL Database for User Service
   postgres:
     image: postgres:15
     container_name: user-service-postgres
     environment:
-      POSTGRES_DB: user-service-postgres
+      POSTGRES_DB: user-service-db # Database name from start-db.sh
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: mbr101
       POSTGRES_INITDB_ARGS: '--encoding=UTF-8'
     ports:
       - "5432:5432"
     volumes:
+      # This path is now correct. It goes up one directory from 'docker/' to find 'scripts/'.
+      - ../scripts/init-user-db.sql:/docker-entrypoint-initdb.d/init-user-db.sql
       - user_postgres_data:/var/lib/postgresql/data
-      - ./scripts/init-user-db.sql:/docker-entrypoint-initdb.d/init-user-db.sql
     networks:
       - user-service-network
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isrady -U postgres -d user_service_db']
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d user_service_db']
       interval: 30s
       timeout: 10s
       retries: 5

@@ -85,5 +85,7 @@ logging:
     com.eventsphere.user: ${LOG_LEVEL:INFO}
     org.springframework.security: WARN
     org.hibernate.SQL: ${SQL_LOG_LEVEL:WARN}
+    '[org.apache.coyote.http11.Http11InputBuffer]': ERROR  # Suppress invalid HTTP request errors
+    '[org.apache.tomcat.util.http.parser.HttpParser]': ERROR  # Suppress HTTP parsing errors
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"

@@ -1,10 +1,8 @@
 package org.com.eventsphere.user.service.impl;
 
-import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import org.com.eventsphere.user.dto.UserRegistrationRequest;
 import org.com.eventsphere.user.dto.UserResponse;
-import org.com.eventsphere.user.entity.Role;
 import org.com.eventsphere.user.entity.User;
 import org.com.eventsphere.user.repository.UserRepository;
 import org.com.eventsphere.user.service.UserService;
@@ -14,140 +12,69 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.stream.Collectors;
+/**
+ * UserServiceImpl
+ * The concrete implementation of the UserService interface. This is where the core business logic resides.
+ */
 
-@Service
-@RequiredArgsConstructor
-@Transactional
+@Service // 1. Marks this class as a Spring service bean, making it available for dependency injection.
+@RequiredArgsConstructor // 2. Lombok annotation to create a constructor with all final fields.
 public class UserServiceImpl implements UserService {
-
+    // A logger for logging messages. It's a best practice for debugging and monitoring.
     private static final Logger log = LoggerFactory.getLogger(UserServiceImpl.class);
+
+    // 3. Injecting dependencies via constructor. These are the tools our service needs.
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
-    @Override
-    @Transactional
-    public UserResponse registerUser(UserRegistrationRequest request) {
-        log.info("Registering new user with email: {}", request.getEmail());
 
-        if(userRepository.existsByEmail(request.getEmail())) {
-            log.warn("Email {} is already taken", request.getEmail());
-            throw new RuntimeException("Email already registered: " + request.getEmail());
+    @Override
+    @Transactional // 4. Ensures the entire method runs within a single database transaction.
+    public UserResponse registerUser(UserRegistrationRequest request) {
+        log.info("Registering user with email: {}", request.getEmail());
+
+        // 5. Business Rule: Check if a user with this email already exists.
+        if(userRepository.findByEmail(request.getEmail()).isPresent()) {
+            log.warn("Registration failed: Email {} is already taken.", request.getEmail());
+            throw new RuntimeException("Error: Email is already in use!");
         }
 
+        // 6. Create a new User entity from the request DTO.
         User user = User.builder()
-                .email(request.getEmail())
-                .password(passwordEncoder.encode(request.getPassword())) // ✅ Fixed: encode password
                 .firstName(request.getFirstName())
                 .lastName(request.getLastName())
+                .email(request.getEmail())
+                // 7. Security: NEVER store passwords in plain text. Always hash them.
+                .password(passwordEncoder.encode(request.getPassword()))
                 .phoneNumber(request.getPhone())
-                .role(Role.USER)
-                .isActive(true)
-                .emailVerified(false)
-                .build();
+                .isActive(true) // User is active by default
+                .isEmailVerified(false) // Email is not verified upon registration
+                .build(); // The role defaults to USER thanks to @Builder.Default in the User entity.
 
+        // 8. Save the new user to the database.
         User savedUser = userRepository.save(user);
-        log.info("User registered successfully with id: {}", savedUser.getId());
-
-//        Add the email verification code
+        // We will add the email verification logic here later.
 
         return mapToUserResponse(savedUser);
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public UserResponse getUserById(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
-        return mapToUserResponse(user);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<UserResponse> getAllActiveUsers() {
-        return userRepository.findByIsActiveTrueAndEmailVerifiedTrue()
-                .stream()
-                .map(this::mapToUserResponse)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public UserResponse getUserByEmail(String email) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
-        return mapToUserResponse(user);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public boolean isEmailTaken(String email) {
-        return userRepository.existsByEmail(email);
-    }
-
-    @Override
-    public void updateLastLogin(Long userId) {
-        userRepository.updateLastLogin(userId, LocalDateTime.now());
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<UserResponse> getAllUsers() {
-        return userRepository.findAll().stream()
-                .map(this::mapToUserResponse)
-                .collect(Collectors.toList());
-    }
+    /**
+     * A private helper method to map a User entity to a UserResponse DTO.
+     * This keeps our main logic clean and handles the conversion in one place.
+     */
 
     private UserResponse mapToUserResponse(User user) {
-        UserResponse userResponse = new UserResponse();
-        userResponse.setId(user.getId());
-        userResponse.setEmail(user.getEmail());
-        userResponse.setFirstName(user.getFirstName());
-        userResponse.setLastName(user.getLastName());
-        userResponse.setPhoneNumber(user.getPhoneNumber());
-        userResponse.setRole(user.getRole().name());
-        userResponse.setIsActive(user.getIsActive());
-        userResponse.setIsEmailVerified(user.getEmailVerified());
-        userResponse.setCreatedAt(user.getCreatedAt());
-        userResponse.setLastLogin(user.getLastLogin());
-        return userResponse;
-    }
-
-    // TODO methods - implement as needed
-    @Override
-    public UserResponse updateUser(Long id, UserRegistrationRequest request) {
-        throw new UnsupportedOperationException("Not implemented yet");
-    }
-
-    @Override
-    public void deactivateUser(Long id) {
-        throw new UnsupportedOperationException("Not implemented yet");
-    }
-
-    @Override
-    public void sendEmailVerification(String email) {
-        throw new UnsupportedOperationException("Not implemented yet");
-    }
-
-    @Override
-    public boolean verifyEmail(String email, String token) {
-        throw new UnsupportedOperationException("Not implemented yet");
-    }
-
-    @Override
-    public void initiatePasswordReset(String email) {
-        throw new UnsupportedOperationException("Not implemented yet");
-    }
-
-    @Override
-    public boolean resetPassword(String email, String token, String newPassword) {
-        throw new UnsupportedOperationException("Not implemented yet");
-    }
-
-    @Override
-    public UserResponse promoteToOrganizer(Long userId) {
-        throw new UnsupportedOperationException("Not implemented yet");
+        return UserResponse.builder()
+                .id(user.getUserId())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .email(user.getEmail())
+                .phoneNumber(user.getPhoneNumber())
+                .role(user.getRole().name())
+                .isActive(user.isActive())
+                .isEmailVerified(user.isEmailVerified())
+                .createdAt(user.getCreatedAt())
+                .lastLoginAt(user.getLastLoginAt())
+                .build();
     }
 }
