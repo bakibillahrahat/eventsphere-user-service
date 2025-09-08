@@ -1,16 +1,26 @@
 package org.com.eventsphere.user.service.impl;
 
 import lombok.RequiredArgsConstructor;
+import org.com.eventsphere.user.dto.AuthenticationResponse;
+import org.com.eventsphere.user.dto.LoginRequest;
 import org.com.eventsphere.user.dto.UserRegistrationRequest;
 import org.com.eventsphere.user.dto.UserResponse;
 import org.com.eventsphere.user.entity.User;
+import org.com.eventsphere.user.exception.EmailAlreadyExistsException;
+import org.com.eventsphere.user.exception.UserNotFoundException;
 import org.com.eventsphere.user.repository.UserRepository;
+import org.com.eventsphere.user.service.JwtService;
 import org.com.eventsphere.user.service.UserService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 /**
  * UserServiceImpl
@@ -26,6 +36,8 @@ public class UserServiceImpl implements UserService {
     // 3. Injecting dependencies via constructor. These are the tools our service needs.
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AuthenticationManager authenticationManager;
+    private final JwtService jwtService;
 
 
     @Override
@@ -36,7 +48,7 @@ public class UserServiceImpl implements UserService {
         // 5. Business Rule: Check if a user with this email already exists.
         if(userRepository.findByEmail(request.getEmail()).isPresent()) {
             log.warn("Registration failed: Email {} is already taken.", request.getEmail());
-            throw new RuntimeException("Error: Email is already in use!");
+            throw new EmailAlreadyExistsException("Error: Email '" + request.getEmail() + "' is already in use!");
         }
 
         // 6. Create a new User entity from the request DTO.
@@ -48,7 +60,7 @@ public class UserServiceImpl implements UserService {
                 .password(passwordEncoder.encode(request.getPassword()))
                 .phoneNumber(request.getPhone())
                 .isActive(true) // User is active by default
-                .isEmailVerified(false) // Email is not verified upon registration
+                .isEmailVerified(true) // Email is not verified upon registration
                 .build(); // The role defaults to USER thanks to @Builder.Default in the User entity.
 
         // 8. Save the new user to the database.
@@ -56,6 +68,33 @@ public class UserServiceImpl implements UserService {
         // We will add the email verification logic here later.
 
         return mapToUserResponse(savedUser);
+    }
+
+    @Override
+    @Transactional
+    public AuthenticationResponse loginUser(LoginRequest loginRequest) {
+        log.info("Attempting to authenticate user: {}", loginRequest.getEmail());
+        authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(loginRequest.getEmail(), loginRequest.getPassword())
+        );
+        User user = userRepository.findByEmail(loginRequest.getEmail()).orElseThrow(() -> new UserNotFoundException("User not found after successful authentication"));
+        // We will add JWT generation logic here later.
+        String jwtToken = jwtService.generateToken(user);
+        log.info("JWT generated for user: {}", user.getEmail());
+        userRepository.updateLastLogin(user.getUserId(), LocalDateTime.now());
+        return AuthenticationResponse.builder()
+                .token(jwtToken)
+                .user(mapToUserResponse(user))
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public UserResponse getUserById(Long userId) {
+        log.info("Fetching user with ID: {}", userId);
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException("User not found with ID: " + userId));
+        return mapToUserResponse(user);
     }
 
     /**

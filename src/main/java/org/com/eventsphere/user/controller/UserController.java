@@ -3,6 +3,8 @@ package org.com.eventsphere.user.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.com.eventsphere.user.dto.AuthenticationResponse;
+import org.com.eventsphere.user.dto.LoginRequest;
 import org.com.eventsphere.user.dto.UserRegistrationRequest;
 import org.com.eventsphere.user.dto.UserResponse;
 import org.com.eventsphere.user.service.UserService;
@@ -47,5 +49,24 @@ public class UserController {
 
         // 8. Return a successful HTTP response (201 CREATED) with the new user's data in the body.
         return ResponseEntity.status(201).body(userResponse);
+    }
+
+    /**
+     * API endpoint for user login.
+     * URL: POST http://localhost:8081/api/v1/users/login
+     *
+     * @param request The request body containing the user's email and password.
+     * @return An HTTP response with the JWT and user details.
+     */
+
+    @PostMapping("/login")
+    public ResponseEntity<AuthenticationResponse> loginUser(@Valid @RequestBody LoginRequest loginRequest) {
+        log.info("Received login request for email: {}", loginRequest.getEmail());
+
+        // Delegate the actual business logic to the service layer.
+        AuthenticationResponse authResponse = userService.loginUser(loginRequest);
+
+        // Return a successful HTTP response (200 OK) with the authentication details in the body.
+        return ResponseEntity.ok(authResponse);
     }
 }
