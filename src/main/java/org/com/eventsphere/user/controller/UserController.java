@@ -11,10 +11,7 @@ import org.com.eventsphere.user.service.UserService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 /**
  * UserController
@@ -68,5 +65,12 @@ public class UserController {
 
         // Return a successful HTTP response (200 OK) with the authentication details in the body.
         return ResponseEntity.ok(authResponse);
+    }
+
+    @GetMapping("/{id}")
+    public  ResponseEntity<UserResponse> getUserById(@PathVariable Long id) {
+        log.info("Received request to get user by id: {}", id);
+        UserResponse userResponse = userService.getUserById(id);
+        return ResponseEntity.ok(userResponse);
     }
 }

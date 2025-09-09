@@ -1,6 +1,7 @@
 package org.com.eventsphere.user.config;
 
 import lombok.RequiredArgsConstructor;
+import org.com.eventsphere.user.Auth.JwtAuthenticationFilter;
 import org.com.eventsphere.user.exception.UserNotFoundException;
 import org.com.eventsphere.user.repository.UserRepository;
 import org.springframework.context.annotation.Bean;
@@ -17,6 +18,8 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.bind.annotation.ControllerAdvice;
 
 /**
  * SecurityConfig
@@ -77,7 +80,7 @@ public class SecurityConfig {
      * It defines a filter chain that tells Spring Security how to handle incoming requests.
      */
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtAuthenticationFilter jwtAuthenticationFilter) throws Exception {
         http
                 // 1. Disable CSRF (Cross-Site Request Forgery) protection. This is common for stateless REST APIs.
                 .csrf(AbstractHttpConfigurer::disable)
@@ -97,7 +100,9 @@ public class SecurityConfig {
 
                 // 6. Configure session management to be STATELESS.
                 // Since we will be using JWTs, the server will not hold any session state.
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authenticationProvider(authenticationProvider())
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
