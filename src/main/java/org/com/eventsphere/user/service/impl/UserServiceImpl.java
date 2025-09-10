@@ -5,12 +5,17 @@ import org.com.eventsphere.user.dto.AuthenticationResponse;
 import org.com.eventsphere.user.dto.LoginRequest;
 import org.com.eventsphere.user.dto.UserRegistrationRequest;
 import org.com.eventsphere.user.dto.UserResponse;
+import org.com.eventsphere.user.entity.RefreshToken;
 import org.com.eventsphere.user.entity.User;
+import org.com.eventsphere.user.entity.VerificationToken;
 import org.com.eventsphere.user.exception.EmailAlreadyExistsException;
 import org.com.eventsphere.user.exception.UserNotFoundException;
 import org.com.eventsphere.user.repository.UserRepository;
+import org.com.eventsphere.user.repository.VerificationTokenRepository;
 import org.com.eventsphere.user.service.JwtService;
+import org.com.eventsphere.user.service.RefreshTokenService;
 import org.com.eventsphere.user.service.UserService;
+import org.com.eventsphere.user.utils.UserMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -19,8 +24,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 /**
  * UserServiceImpl
@@ -38,6 +45,9 @@ public class UserServiceImpl implements UserService {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
+    private final VerificationTokenRepository verificationTokenRepository;
+    private final RefreshTokenService refreshTokenService;
+    private final UserMapper userMapper;
 
 
     @Override
@@ -65,9 +75,20 @@ public class UserServiceImpl implements UserService {
 
         // 8. Save the new user to the database.
         User savedUser = userRepository.save(user);
-        // We will add the email verification logic here later.
+        log.info("User registered successfully with ID: {}", savedUser.getUserId());
 
-        return mapToUserResponse(savedUser);
+        // We will add the email verification logic here later.
+        String tokenValue = UUID.randomUUID().toString();
+        VerificationToken verificationToken = VerificationToken.builder()
+                .token(tokenValue)
+                .user(savedUser)
+                .type(VerificationToken.TokenType.EMAIL_VERIFICATION)
+                .expiryDate(Instant.now().plusSeconds(86400))
+                .build();
+        verificationTokenRepository.save(verificationToken);
+        log.info("Verification token generated for user: {}", savedUser.getEmail());
+
+        return userMapper.toUserResponse(savedUser);
     }
 
     @Override
@@ -82,9 +103,15 @@ public class UserServiceImpl implements UserService {
         String jwtToken = jwtService.generateToken(user);
         log.info("JWT generated for user: {}", user.getEmail());
         userRepository.updateLastLogin(user.getUserId(), LocalDateTime.now());
+
+        RefreshToken refreshToken = refreshTokenService.createOrUpdateRefreshToken(user);
+        log.info("Refresh token generated for user: {}", user.getEmail());
+        userRepository.updateLastLogin(user.getUserId(), LocalDateTime.now());
+
         return AuthenticationResponse.builder()
-                .token(jwtToken)
-                .user(mapToUserResponse(user))
+                .accessToken(jwtToken)
+                .refreshToken(refreshToken.getToken())
+                .user(userMapper.toUserResponse(user))
                 .build();
     }
 
@@ -94,26 +121,7 @@ public class UserServiceImpl implements UserService {
         log.info("Fetching user with ID: {}", userId);
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException("User not found with ID: " + userId));
-        return mapToUserResponse(user);
+        return userMapper.toUserResponse(user);
     }
 
-    /**
-     * A private helper method to map a User entity to a UserResponse DTO.
-     * This keeps our main logic clean and handles the conversion in one place.
-     */
-
-    private UserResponse mapToUserResponse(User user) {
-        return UserResponse.builder()
-                .id(user.getUserId())
-                .firstName(user.getFirstName())
-                .lastName(user.getLastName())
-                .email(user.getEmail())
-                .phoneNumber(user.getPhoneNumber())
-                .role(user.getRole().name())
-                .isActive(user.isActive())
-                .isEmailVerified(user.isEmailVerified())
-                .createdAt(user.getCreatedAt())
-                .lastLoginAt(user.getLastLoginAt())
-                .build();
-    }
 }

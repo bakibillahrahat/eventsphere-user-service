@@ -19,7 +19,7 @@ import java.time.Instant;
 public class VerificationToken {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long verificationTokenId;
+    private Long id;
 
     @Column(nullable = false, unique = true)
     private String token;
