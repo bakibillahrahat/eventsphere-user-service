@@ -9,9 +9,11 @@ import org.com.eventsphere.user.entity.RefreshToken;
 import org.com.eventsphere.user.entity.User;
 import org.com.eventsphere.user.entity.VerificationToken;
 import org.com.eventsphere.user.exception.EmailAlreadyExistsException;
+import org.com.eventsphere.user.exception.TokenRefreshException;
 import org.com.eventsphere.user.exception.UserNotFoundException;
 import org.com.eventsphere.user.repository.UserRepository;
 import org.com.eventsphere.user.repository.VerificationTokenRepository;
+import org.com.eventsphere.user.service.EmailService;
 import org.com.eventsphere.user.service.JwtService;
 import org.com.eventsphere.user.service.RefreshTokenService;
 import org.com.eventsphere.user.service.UserService;
@@ -27,6 +29,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -44,6 +48,7 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
+    private final EmailService emailService;
     private final JwtService jwtService;
     private final VerificationTokenRepository verificationTokenRepository;
     private final RefreshTokenService refreshTokenService;
@@ -70,7 +75,7 @@ public class UserServiceImpl implements UserService {
                 .password(passwordEncoder.encode(request.getPassword()))
                 .phoneNumber(request.getPhone())
                 .isActive(true) // User is active by default
-                .isEmailVerified(true) // Email is not verified upon registration
+                .isEmailVerified(false) // Email is not verified upon registration
                 .build(); // The role defaults to USER thanks to @Builder.Default in the User entity.
 
         // 8. Save the new user to the database.
@@ -87,6 +92,10 @@ public class UserServiceImpl implements UserService {
                 .build();
         verificationTokenRepository.save(verificationToken);
         log.info("Verification token generated for user: {}", savedUser.getEmail());
+
+        // Send verification email
+        emailService.sendVerificationEmail(savedUser.getEmail(), tokenValue);
+        log.info("Verification email sent to: {}", savedUser.getEmail());
 
         return userMapper.toUserResponse(savedUser);
     }
@@ -122,6 +131,41 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException("User not found with ID: " + userId));
         return userMapper.toUserResponse(user);
+    }
+
+    @Override
+    @Transactional
+    public String verifyEmail(String token) {
+
+        VerificationToken verificationToken = verificationTokenRepository.findByToken(token)
+                .orElseThrow(() -> new TokenRefreshException(token, "Invalid verification token."));
+
+        if(verificationToken.isExpired()) {
+            verificationTokenRepository.delete(verificationToken);
+            throw new TokenRefreshException(token, "Verification token has expired.");
+        }
+
+        // Properly fetch the user to avoid lazy initialization issues
+        User user = userRepository.findById(verificationToken.getUser().getUserId())
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+
+        user.setEmailVerified(true);
+        userRepository.save(user);
+        verificationTokenRepository.delete(verificationToken);
+        log.info("Email verified successfully for user: {}", user.getEmail());
+        return "Email verified successfully.";
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<UserResponse> getAllUsers() {
+        log.info("Fetching all users");
+        Optional<List<User>> usersOpt = Optional.of(userRepository.findAll());
+        if(usersOpt.isPresent() && !usersOpt.get().isEmpty()) {
+            return userMapper.toUserResponseList(usersOpt.get());
+        }
+        log.info("No users found in the database.");
+        return List.of();
     }
 
 }

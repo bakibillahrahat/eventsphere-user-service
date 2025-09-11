@@ -18,4 +18,8 @@ public interface UserService {
      */
     AuthenticationResponse loginUser(LoginRequest loginRequest);
     UserResponse getUserById(Long id);
+    String verifyEmail(String email);
+
+
+    List<UserResponse> getAllUsers();
 }

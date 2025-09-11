@@ -12,9 +12,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -50,5 +52,12 @@ public class AuthController {
         log.info("Received request to refresh token.");
         AuthenticationResponse response = refreshTokenService.generateNewAccessToken(request.getToken());
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/verify-email")
+    public ResponseEntity<String> verifyEmail(@RequestParam("token") String token) {
+        log.info("Received email verification request for token: {}", token);
+        userService.verifyEmail(token);
+        return ResponseEntity.ok("Email verified successfully! You can now log in to your account.");
     }
 }
