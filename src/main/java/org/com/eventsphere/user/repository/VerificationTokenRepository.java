@@ -13,3 +13,4 @@ public interface VerificationTokenRepository extends JpaRepository<VerificationT
     @Query("SELECT vt FROM VerificationToken vt JOIN FETCH vt.user WHERE vt.token = :token")
     Optional<VerificationToken> findByTokenWithUser(@Param("token") String token);
 }
+

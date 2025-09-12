@@ -1,11 +1,17 @@
 package org.com.eventsphere.user.controller;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.com.eventsphere.user.dto.ChangePasswordRequest;
+import org.com.eventsphere.user.dto.UserProfileUpdateRequest;
 import org.com.eventsphere.user.dto.UserResponse;
 import org.com.eventsphere.user.service.UserService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -30,6 +36,7 @@ public class UserController {
      * @return A ResponseEntity containing a list of UserResponse DTOs and HTTP status 200 (OK).
      */
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<UserResponse>> getAllUsers() {
         log.info("Getting all users.");
         List<UserResponse> users = userService.getAllUsers();
@@ -51,4 +58,29 @@ public class UserController {
         UserResponse userResponse = userService.getUserById(id);
         return ResponseEntity.ok(userResponse);
     }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN') or #id == @userSecurity.getUserId(principal)")
+    public ResponseEntity<UserResponse> updateUserProfile(@PathVariable Long id, @RequestBody UserProfileUpdateRequest request){
+        log.info("Received request to update user profile: {}", request);
+        UserResponse updatedUser = userService.updateUserProfile(id, request);
+        return ResponseEntity.ok(updatedUser);
+    }
+
+    @PutMapping("/change-password")
+    public ResponseEntity<String> changeUserPassword(@Valid @RequestBody ChangePasswordRequest request, @AuthenticationPrincipal UserDetails principal) {
+        log.info("Received request to change password for user: {}", principal.getUsername());
+        userService.changeUserPassword(request, principal);
+        return ResponseEntity.ok("Password changed successfully.");
+    }
+
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN') or #id == @userSecurity.getUserId(principal)")
+    public ResponseEntity<String> deleteUser(@PathVariable Long id) {
+        log.info("Received request to delete user profile: {}", id);
+        userService.deleteUser(id);
+        return ResponseEntity.ok("User with ID " + id + " has been deleted successfully.");
+    }
+
 }

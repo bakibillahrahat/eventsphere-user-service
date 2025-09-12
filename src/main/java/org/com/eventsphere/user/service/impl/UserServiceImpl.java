@@ -6,6 +6,7 @@ import org.com.eventsphere.user.entity.RefreshToken;
 import org.com.eventsphere.user.entity.User;
 import org.com.eventsphere.user.entity.VerificationToken;
 import org.com.eventsphere.user.exception.EmailAlreadyExistsException;
+import org.com.eventsphere.user.exception.InvalidCredentialsException;
 import org.com.eventsphere.user.exception.TokenRefreshException;
 import org.com.eventsphere.user.exception.UserNotFoundException;
 import org.com.eventsphere.user.repository.UserRepository;
@@ -19,6 +20,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -193,6 +195,8 @@ public class UserServiceImpl implements UserService {
         return "Password reset successfully.";
     }
 
+
+
     @Override
     @Transactional(readOnly = true)
     public UserResponse getUserById(Long userId) {
@@ -202,7 +206,56 @@ public class UserServiceImpl implements UserService {
         return userMapper.toUserResponse(user);
     }
 
+    // User Profile Management methods to be implemented later.
 
+    @Override
+    public UserResponse updateUserProfile(Long id, UserProfileUpdateRequest request) {
+        log.info("Updating user profile for user with ID: {}", id);
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new UserNotFoundException("User not found with ID: " + id));
+        // Update only the fields that are provided in the request
+        if (request.getFirstName() != null && !request.getFirstName().isBlank()) {
+            user.setFirstName(request.getFirstName());
+        }
+        if (request.getLastName() != null && !request.getLastName().isBlank()) {
+            user.setLastName(request.getLastName());
+        }
+        if (request.getPhoneNumber() != null && !request.getPhoneNumber().isBlank()) {
+            user.setPhoneNumber(request.getPhoneNumber());
+        }
+        User updatedUser = userRepository.save(user);
+        log.info("User profile updated successfully for user with ID: {}", id);
+        return userMapper.toUserResponse(updatedUser);
+    }
+
+    @Override
+    @Transactional
+    public void changeUserPassword(ChangePasswordRequest request, UserDetails currentUser) {
+        User user = userRepository.findByEmail(currentUser.getUsername())
+                .orElseThrow(() -> new UserNotFoundException("Authenticated user not found in database."));
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            log.warn("Password change failed for user {}: Incorrect current password.", user.getEmail());
+            throw new InvalidCredentialsException("Incorrect current password provided.");
+        }
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+        log.info("Password changed successfully for user: {}", user.getEmail());
+    }
+
+    @Override
+    @Transactional
+    public void deleteUser(Long userId) {
+        log.info("Attempting to delete user with ID: {}", userId);
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException("User not found with ID: " + userId));
+
+        refreshTokenService.deleteByUser(user);
+        userRepository.deleteById(userId);
+        log.info("User with ID: {} has been deleted successfully.", userId);
+    }
+
+    // Admin-specific method to fetch all users
+    // This method should ideally be protected to be accessible only by admin users.
 
     @Override
     @Transactional(readOnly = true)

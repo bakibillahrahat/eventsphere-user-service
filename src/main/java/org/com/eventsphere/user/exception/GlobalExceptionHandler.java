@@ -3,6 +3,7 @@ package org.com.eventsphere.user.exception;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.InternalAuthenticationServiceException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -92,6 +93,21 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Handles InvalidCredentialsException thrown during password change operations.
+     * This occurs when the current password provided is incorrect.
+     */
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ResponseEntity<Object> handleInvalidCredentialsException(InvalidCredentialsException ex) {
+        Map<String, Object> body = Map.of(
+                "timestamp", LocalDateTime.now(),
+                "status", HttpStatus.BAD_REQUEST.value(),
+                "error", "Bad Request",
+                "message", ex.getMessage()
+        );
+        return new ResponseEntity<>(body, HttpStatus.BAD_REQUEST);
+    }
+
+    /**
      * Handles validation errors from @Valid annotation and returns a 400 BAD_REQUEST response.
      * This method extracts all validation error messages and formats them into a clean response.
      */
@@ -160,5 +176,20 @@ public class GlobalExceptionHandler {
                 "path", requestedPath != null ? requestedPath : "unknown"
         );
         return new ResponseEntity<>(body, HttpStatus.NOT_FOUND);
+    }
+
+    /**
+     * Handles DisabledException thrown when a user account is disabled.
+     * This provides a clear message to the client indicating the account status.
+     */
+    @ExceptionHandler(DisabledException.class)
+    public ResponseEntity<Object> handleDisabledException(DisabledException ex) {
+        Map<String, Object> body = Map.of(
+                "timestamp", LocalDateTime.now(),
+                "status", HttpStatus.FORBIDDEN.value(),
+                "error", "Forbidden",
+                "message", "Your account is disabled. Please contact support for assistance."
+        );
+        return new ResponseEntity<>(body, HttpStatus.FORBIDDEN);
     }
 }
