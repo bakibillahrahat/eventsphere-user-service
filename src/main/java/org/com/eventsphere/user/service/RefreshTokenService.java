@@ -6,7 +6,7 @@ import org.com.eventsphere.user.entity.RefreshToken;
 import org.com.eventsphere.user.entity.User;
 import org.com.eventsphere.user.exception.TokenRefreshException;
 import org.com.eventsphere.user.repository.RefreshTokenRepository;
-import org.com.eventsphere.user.utils.UserMapper;
+import org.com.eventsphere.user.mapper.UserMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

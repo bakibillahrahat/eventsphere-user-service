@@ -1,4 +1,4 @@
-package org.com.eventsphere.user.utils;
+package org.com.eventsphere.user.mapper;
 
 import org.com.eventsphere.user.dto.UserResponse;
 import org.com.eventsphere.user.entity.User;

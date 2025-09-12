@@ -30,7 +30,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> searchByFirstNameLastNameOrEmail(@Param("query") String query);
     List<User> findByIsActive(boolean isActive);
     List<User> findByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
-    List<User> findByLastLoginBefore(LocalDateTime dateTime);
+    List<User> findByLastLoginAtBefore(LocalDateTime dateTime);
 
     @Modifying
     @Query("DELETE FROM User u WHERE u.isEmailVerified = false AND u.createdAt < :cutoff")

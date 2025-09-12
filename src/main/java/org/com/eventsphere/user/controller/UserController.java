@@ -61,7 +61,7 @@ public class UserController {
     }
 
     @PutMapping("/update/{id}")
-    @PreAuthorize("hasRole('ADMIN') or #id == @userSecurity.getUserId(principal)")
+    @PreAuthorize("hasRole('ADMIN') or #id == @userSecurity.getUserId(authentication.principal)")
     public ResponseEntity<UserResponse> updateUserProfile(@PathVariable Long id, @RequestBody UserProfileUpdateRequest request){
         log.info("Received request to update user profile: {}", request);
         UserResponse updatedUser = userService.updateUserProfile(id, request);
@@ -77,7 +77,7 @@ public class UserController {
 
 
     @DeleteMapping("/delete/{id}")
-    @PreAuthorize("hasRole('ADMIN') or #id == @userSecurity.getUserId(principal)")
+    @PreAuthorize("hasRole('ADMIN') or #id == @userSecurity.getUserId(authentication.principal)")
     public ResponseEntity<String> deleteUser(@PathVariable Long id) {
         log.info("Received request to delete user profile: {}", id);
         userService.deleteUser(id);
@@ -97,5 +97,5 @@ public class UserController {
     }
 
 
-
 }
+

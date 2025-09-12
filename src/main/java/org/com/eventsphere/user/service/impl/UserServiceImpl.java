@@ -2,21 +2,19 @@ package org.com.eventsphere.user.service.impl;
 
 import lombok.RequiredArgsConstructor;
 import org.com.eventsphere.user.dto.*;
-import org.com.eventsphere.user.entity.RefreshToken;
-import org.com.eventsphere.user.entity.Role;
-import org.com.eventsphere.user.entity.User;
-import org.com.eventsphere.user.entity.VerificationToken;
+import org.com.eventsphere.user.entity.*;
 import org.com.eventsphere.user.exception.EmailAlreadyExistsException;
 import org.com.eventsphere.user.exception.InvalidCredentialsException;
 import org.com.eventsphere.user.exception.TokenRefreshException;
 import org.com.eventsphere.user.exception.UserNotFoundException;
+import org.com.eventsphere.user.repository.LoginAttemptRepository;
 import org.com.eventsphere.user.repository.UserRepository;
 import org.com.eventsphere.user.repository.VerificationTokenRepository;
 import org.com.eventsphere.user.service.EmailService;
 import org.com.eventsphere.user.service.JwtService;
 import org.com.eventsphere.user.service.RefreshTokenService;
 import org.com.eventsphere.user.service.UserService;
-import org.com.eventsphere.user.utils.UserMapper;
+import org.com.eventsphere.user.mapper.UserMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -53,6 +51,7 @@ public class UserServiceImpl implements UserService {
     private final VerificationTokenRepository verificationTokenRepository;
     private final RefreshTokenService refreshTokenService;
     private final UserMapper userMapper;
+    private final LoginAttemptRepository loginAttemptRepository;
 
     // Authentication & User Lifecycle methods
     @Override
@@ -394,7 +393,7 @@ public class UserServiceImpl implements UserService {
     @Transactional(readOnly = true)
     public List<UserResponse> getUsersLastActiveBefore(LocalDateTime dateTime) {
         log.info("Fetching users last active before {}", dateTime);
-        return userRepository.findByLastLoginBefore(dateTime).stream()
+        return userRepository.findByLastLoginAtBefore(dateTime).stream()
                 .map(userMapper::toUserResponse)
                 .collect(Collectors.toList());
     }
@@ -483,16 +482,28 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public void recordLoginAttempt(String email, boolean successful) {
-        // This is a stub implementation. You would typically save this to a database.
-        log.info("Attempting to record login attempt for user ID: {}", email);
-        log.info("Login attempt for user {} was {}", email, successful ? "successful" : "unsuccessful");
+        log.info("Recording login attempt for email: {}. Successful: {}", email, successful);
+        // Create LoginAttempt using the builder pattern
+        LoginAttempt loginAttempt = LoginAttempt.builder()
+                .email(email)
+                .successful(successful)
+                .build();
+        loginAttemptRepository.save(loginAttempt);
+        log.info("Login attempt recorded for email: {}", email);
     }
 
     @Override
     public List<LoginAttemptResponse> getLoginAttempts(String email) {
-        log.info("Fetching login attempts for user ID: {}", email);
-        // This is a stub implementation. You would typically fetch this from a database.
+        log.info("Fetching login attempts for email: {}", email);
+        List<LoginAttempt> loginAttempts = loginAttemptRepository.findByEmailOrderByTimestampDesc(email);
 
-        return List.of();
+        return loginAttempts.stream()
+                .map(attempt -> new LoginAttemptResponse(
+                        attempt.getId(),
+                        attempt.getEmail(),
+                        attempt.isSuccessful(),
+                        attempt.getTimestamp()
+                ))
+                .collect(Collectors.toList());
     }
 }
