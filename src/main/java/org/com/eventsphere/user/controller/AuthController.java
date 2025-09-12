@@ -60,4 +60,25 @@ public class AuthController {
         userService.verifyEmail(token);
         return ResponseEntity.ok("Email verified successfully! You can now log in to your account.");
     }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<String> forgotPassword(@Valid @RequestBody PasswordResetRequest request) {
+        log.info("Received password reset request for email: {}", request.getEmail());
+        String result = userService.initiatePasswordReset(request);
+        return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<String> resetPassword(@Valid @RequestBody PasswordUpdateRequest request) {
+        log.info("Received password update request.");
+        String result = userService.resetPassword(request);
+        return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<String> logoutUser(@Valid @RequestBody RefreshTokenRequest request) {
+        log.info("Received logout request");
+        String result = userService.logoutUser(request.getToken());
+        return ResponseEntity.ok(result);
+    }
 }

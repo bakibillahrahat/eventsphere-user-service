@@ -1,10 +1,7 @@
 package org.com.eventsphere.user.service.impl;
 
 import lombok.RequiredArgsConstructor;
-import org.com.eventsphere.user.dto.AuthenticationResponse;
-import org.com.eventsphere.user.dto.LoginRequest;
-import org.com.eventsphere.user.dto.UserRegistrationRequest;
-import org.com.eventsphere.user.dto.UserResponse;
+import org.com.eventsphere.user.dto.*;
 import org.com.eventsphere.user.entity.RefreshToken;
 import org.com.eventsphere.user.entity.User;
 import org.com.eventsphere.user.entity.VerificationToken;
@@ -27,10 +24,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -54,6 +49,7 @@ public class UserServiceImpl implements UserService {
     private final RefreshTokenService refreshTokenService;
     private final UserMapper userMapper;
 
+    // Authentication and Forgot Password will be added later.
 
     @Override
     @Transactional // 4. Ensures the entire method runs within a single database transaction.
@@ -102,6 +98,29 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
+    public String verifyEmail(String token) {
+
+        VerificationToken verificationToken = verificationTokenRepository.findByToken(token)
+                .orElseThrow(() -> new TokenRefreshException(token, "Invalid verification token."));
+
+        if(verificationToken.isExpired()) {
+            verificationTokenRepository.delete(verificationToken);
+            throw new TokenRefreshException(token, "Verification token has expired.");
+        }
+
+        // Properly fetch the user to avoid lazy initialization issues
+        User user = userRepository.findById(verificationToken.getUser().getUserId())
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+
+        user.setEmailVerified(true);
+        userRepository.save(user);
+        verificationTokenRepository.delete(verificationToken);
+        log.info("Email verified successfully for user: {}", user.getEmail());
+        return "Email verified successfully.";
+    }
+
+    @Override
+    @Transactional
     public AuthenticationResponse loginUser(LoginRequest loginRequest) {
         log.info("Attempting to authenticate user: {}", loginRequest.getEmail());
         authenticationManager.authenticate(
@@ -125,6 +144,56 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    public String logoutUser(String refreshToken) {
+        log.info("Processing logout request with refresh token");
+        refreshTokenService.deleteByToken(refreshToken);
+        log.info("User successfully logged out - refresh token invalidated");
+        return "Successfully logged out";
+    }
+
+    @Override
+    @Transactional
+    public String initiatePasswordReset(PasswordResetRequest request) {
+        log.info("Initiating password reset for email: {}", request.getEmail());
+        userRepository.findByEmail(request.getEmail()).ifPresent(user -> {
+            String tokenValue = UUID.randomUUID().toString();
+            VerificationToken resetToken = VerificationToken.builder()
+                    .token(tokenValue)
+                    .user(user)
+                    .type(VerificationToken.TokenType.PASSWORD_RESET)
+                    .expiryDate(Instant.now().plusSeconds(900))
+                    .build();
+            verificationTokenRepository.save(resetToken);
+            log.info("Password reset token generated for user: {}", user.getEmail());
+            emailService.sendPasswordResetEmail(user.getEmail(), tokenValue);
+            log.info("Password reset email sent to: {}", user.getEmail());
+        });
+
+        return "";
+    }
+
+    @Override
+    @Transactional
+    public String resetPassword(PasswordUpdateRequest request) {
+        log.info("Attempting to reset password with token: {}", request.getToken());
+        VerificationToken verificationToken = verificationTokenRepository.findByTokenWithUser(request.getToken())
+                .orElseThrow(() -> new TokenRefreshException(request.getToken(), "Invalid password reset token."));
+
+        if(verificationToken.isExpired() || verificationToken.getType() != VerificationToken.TokenType.PASSWORD_RESET) {
+            verificationTokenRepository.delete(verificationToken);
+            throw new TokenRefreshException(request.getToken(), "Password reset token has expired or is invalid.");
+        }
+        // user user builder
+        User user = verificationToken.getUser();
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+
+        verificationTokenRepository.delete(verificationToken);
+        log.info("Password reset successfully for user: {}", user.getEmail());
+        return "Password reset successfully.";
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public UserResponse getUserById(Long userId) {
         log.info("Fetching user with ID: {}", userId);
@@ -133,36 +202,15 @@ public class UserServiceImpl implements UserService {
         return userMapper.toUserResponse(user);
     }
 
-    @Override
-    @Transactional
-    public String verifyEmail(String token) {
 
-        VerificationToken verificationToken = verificationTokenRepository.findByToken(token)
-                .orElseThrow(() -> new TokenRefreshException(token, "Invalid verification token."));
-
-        if(verificationToken.isExpired()) {
-            verificationTokenRepository.delete(verificationToken);
-            throw new TokenRefreshException(token, "Verification token has expired.");
-        }
-
-        // Properly fetch the user to avoid lazy initialization issues
-        User user = userRepository.findById(verificationToken.getUser().getUserId())
-                .orElseThrow(() -> new UserNotFoundException("User not found"));
-
-        user.setEmailVerified(true);
-        userRepository.save(user);
-        verificationTokenRepository.delete(verificationToken);
-        log.info("Email verified successfully for user: {}", user.getEmail());
-        return "Email verified successfully.";
-    }
 
     @Override
     @Transactional(readOnly = true)
     public List<UserResponse> getAllUsers() {
         log.info("Fetching all users");
-        Optional<List<User>> usersOpt = Optional.of(userRepository.findAll());
-        if(usersOpt.isPresent() && !usersOpt.get().isEmpty()) {
-            return userMapper.toUserResponseList(usersOpt.get());
+        List<User> users = userRepository.findAll();
+        if (!users.isEmpty()) {
+            return userMapper.toUserResponseList(users);
         }
         log.info("No users found in the database.");
         return List.of();

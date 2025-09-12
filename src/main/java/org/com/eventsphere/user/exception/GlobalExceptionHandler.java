@@ -2,12 +2,14 @@ package org.com.eventsphere.user.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.InternalAuthenticationServiceException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -74,6 +76,20 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(body, HttpStatus.UNAUTHORIZED);
     }
 
+    /**
+     * Handles BadCredentialsException thrown during authentication.
+     * This occurs when the username/password combination is incorrect.
+     */
+    @ExceptionHandler(BadCredentialsException.class)
+    public ResponseEntity<Object> handleBadCredentialsException(BadCredentialsException ex) {
+        Map<String, Object> body = Map.of(
+                "timestamp", LocalDateTime.now(),
+                "status", HttpStatus.UNAUTHORIZED.value(),
+                "error", "Unauthorized",
+                "message", "Invalid email or password. Please check your credentials and try again."
+        );
+        return new ResponseEntity<>(body, HttpStatus.UNAUTHORIZED);
+    }
 
     /**
      * Handles validation errors from @Valid annotation and returns a 400 BAD_REQUEST response.
@@ -114,5 +130,35 @@ public class GlobalExceptionHandler {
                 "message", "An unexpected error occurred. Please try again later."
         );
         return new ResponseEntity<>(body, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    /**
+     * Handles NoResourceFoundException thrown when a requested URL/endpoint is not found.
+     * This provides a better error message than the default 404 page.
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<Object> handleNoResourceFoundException(NoResourceFoundException ex) {
+        String requestedPath = ex.getResourcePath();
+        String message = "The requested endpoint '" + requestedPath + "' was not found. Please check the URL and try again.";
+
+        // Provide helpful suggestions for common typos
+        if (requestedPath != null) {
+            if (requestedPath.contains("logina")) {
+                message += " Did you mean '/api/v1/auth/login'?";
+            } else if (requestedPath.contains("registe")) {
+                message += " Did you mean '/api/v1/auth/register'?";
+            } else if (requestedPath.contains("forget") || requestedPath.contains("forgot")) {
+                message += " Did you mean '/api/v1/auth/forgot-password'?";
+            }
+        }
+
+        Map<String, Object> body = Map.of(
+                "timestamp", LocalDateTime.now(),
+                "status", HttpStatus.NOT_FOUND.value(),
+                "error", "Not Found",
+                "message", message,
+                "path", requestedPath != null ? requestedPath : "unknown"
+        );
+        return new ResponseEntity<>(body, HttpStatus.NOT_FOUND);
     }
 }

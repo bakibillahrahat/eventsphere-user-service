@@ -65,4 +65,14 @@ public class RefreshTokenService {
                 .user(userMapper.toUserResponse(user))
                 .build();
     }
+
+    @Transactional
+    public void deleteByToken(String token) {
+        refreshTokenRepository.findByToken(token).ifPresent(refreshTokenRepository::delete);
+    }
+
+    @Transactional
+    public void deleteByUser(User user) {
+        refreshTokenRepository.deleteByUser(user);
+    }
 }

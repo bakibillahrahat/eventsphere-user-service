@@ -42,4 +42,25 @@ public class EmailService {
         }
     }
 
+    public void sendPasswordResetEmail(String to, String token) {
+        try{
+            String resetLink = "http://localhost:8081/api/v1/auth/reset-password?token=" + token;
+
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom(fromEmail);
+            message.setTo(to);
+            message.setSubject("EventSphere Password Reset Request");
+            message.setText(
+                    "We received a request to reset your password for your EventSphere account.\n\n" +
+                    "Please click the link below to reset your password:\n" +
+                    resetLink + "\n\n" +
+                    "If you did not request a password reset, please ignore this email. This link will expire in 1 hour.\n\n" +
+                    "Best regards,\nThe EventSphere Team"
+            );
+            mailSender.send(message);
+            log.info("Password reset email sent to {}", to);
+        }catch (Exception e){
+            log.error("Failed to send password reset email to {}: {}", to, e.getMessage());
+        }
+    }
 }

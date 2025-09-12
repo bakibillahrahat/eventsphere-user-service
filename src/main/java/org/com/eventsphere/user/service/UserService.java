@@ -1,24 +1,20 @@
 package org.com.eventsphere.user.service;
 
-import org.com.eventsphere.user.dto.AuthenticationResponse;
-import org.com.eventsphere.user.dto.LoginRequest;
-import org.com.eventsphere.user.dto.UserRegistrationRequest;
-import org.com.eventsphere.user.dto.UserResponse;
+import org.com.eventsphere.user.dto.*;
 
 import java.util.List;
 
 public interface UserService {
-//  User Registration & Management
+//  User Registration, Authentication, Email Verification, Forgot Password, Reset Password
     UserResponse registerUser(UserRegistrationRequest request);
-    /**
-     * Authenticates a user and returns a JWT upon successful login.
-     *
-     * @param request A DTO containing the user's email and password.
-     * @return A DTO containing the JWT and user details.
-     */
     AuthenticationResponse loginUser(LoginRequest loginRequest);
-    UserResponse getUserById(Long id);
+    String logoutUser(String refreshToken);
     String verifyEmail(String email);
+    String initiatePasswordReset(PasswordResetRequest request);
+    String resetPassword(PasswordUpdateRequest request);
+
+
+    UserResponse getUserById(Long id);
 
 
     List<UserResponse> getAllUsers();
