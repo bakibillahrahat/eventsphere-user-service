@@ -10,22 +10,29 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByEmail(String email);
-//    Optional<User> findByEmailAndIsActive(String email, boolean isActive);
-//    List<User> findByRole(Role role);
-//    List<User> findByIsActiveTrueAndEmailVerifiedTrue();
     boolean existsByEmail(String email);
-//
-//    @Query("SELECT u FROM User u WHERE u.createdAt >= :startDate")
-//    List<User> findUsersCreatedAfter(@Param("startDate") LocalDateTime startDate);
-//
     @Modifying
     @Transactional
     @Query("UPDATE User u SET u.lastLoginAt = :loginTime WHERE u.userId = :userId")
     void updateLastLogin(@Param("userId") Long userId, @Param("loginTime") LocalDateTime loginTime);
+
+
+    List<User> findByRole(Role role);
+
+    @Query("SELECT u FROM User u WHERE lower(u.firstName) LIKE lower(concat('%', :query, '%')) OR lower(u.lastName) LIKE lower(concat('%', :query, '%')) OR lower(u.email) LIKE lower(concat('%', :query, '%'))")
+    List<User> searchByFirstNameLastNameOrEmail(@Param("query") String query);
+    List<User> findByIsActive(boolean isActive);
+    List<User> findByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
+    List<User> findByLastLoginBefore(LocalDateTime dateTime);
+
+    @Modifying
+    @Query("DELETE FROM User u WHERE u.isEmailVerified = false AND u.createdAt < :cutoff")
+    void deleteUnverifiedUsersBefore(@Param("cutoff") LocalDateTime cutoff);
 }

@@ -3,6 +3,7 @@ package org.com.eventsphere.user.service.impl;
 import lombok.RequiredArgsConstructor;
 import org.com.eventsphere.user.dto.*;
 import org.com.eventsphere.user.entity.RefreshToken;
+import org.com.eventsphere.user.entity.Role;
 import org.com.eventsphere.user.entity.User;
 import org.com.eventsphere.user.entity.VerificationToken;
 import org.com.eventsphere.user.exception.EmailAlreadyExistsException;
@@ -26,9 +27,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * UserServiceImpl
@@ -51,8 +54,7 @@ public class UserServiceImpl implements UserService {
     private final RefreshTokenService refreshTokenService;
     private final UserMapper userMapper;
 
-    // Authentication and Forgot Password will be added later.
-
+    // Authentication & User Lifecycle methods
     @Override
     @Transactional // 4. Ensures the entire method runs within a single database transaction.
     public UserResponse registerUser(UserRegistrationRequest request) {
@@ -153,6 +155,8 @@ public class UserServiceImpl implements UserService {
         return "Successfully logged out";
     }
 
+    // Password Management methods
+
     @Override
     @Transactional
     public String initiatePasswordReset(PasswordResetRequest request) {
@@ -195,7 +199,21 @@ public class UserServiceImpl implements UserService {
         return "Password reset successfully.";
     }
 
+    @Override
+    @Transactional
+    public void changeUserPassword(ChangePasswordRequest request, UserDetails currentUser) {
+        User user = userRepository.findByEmail(currentUser.getUsername())
+                .orElseThrow(() -> new UserNotFoundException("Authenticated user not found in database."));
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            log.warn("Password change failed for user {}: Incorrect current password.", user.getEmail());
+            throw new InvalidCredentialsException("Incorrect current password provided.");
+        }
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+        log.info("Password changed successfully for user: {}", user.getEmail());
+    }
 
+    // User Profile Management methods
 
     @Override
     @Transactional(readOnly = true)
@@ -206,9 +224,17 @@ public class UserServiceImpl implements UserService {
         return userMapper.toUserResponse(user);
     }
 
-    // User Profile Management methods to be implemented later.
+    @Override
+    @Transactional(readOnly = true)
+    public UserResponse getUserByEmail(String email) {
+        log.info("Fetching user with email: {}", email);
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UserNotFoundException("User not found with email: " + email));
+        return userMapper.toUserResponse(user);
+    }
 
     @Override
+    @Transactional
     public UserResponse updateUserProfile(Long id, UserProfileUpdateRequest request) {
         log.info("Updating user profile for user with ID: {}", id);
         User user = userRepository.findById(id)
@@ -226,20 +252,6 @@ public class UserServiceImpl implements UserService {
         User updatedUser = userRepository.save(user);
         log.info("User profile updated successfully for user with ID: {}", id);
         return userMapper.toUserResponse(updatedUser);
-    }
-
-    @Override
-    @Transactional
-    public void changeUserPassword(ChangePasswordRequest request, UserDetails currentUser) {
-        User user = userRepository.findByEmail(currentUser.getUsername())
-                .orElseThrow(() -> new UserNotFoundException("Authenticated user not found in database."));
-        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
-            log.warn("Password change failed for user {}: Incorrect current password.", user.getEmail());
-            throw new InvalidCredentialsException("Incorrect current password provided.");
-        }
-        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
-        userRepository.save(user);
-        log.info("Password changed successfully for user: {}", user.getEmail());
     }
 
     @Override
@@ -269,4 +281,218 @@ public class UserServiceImpl implements UserService {
         return List.of();
     }
 
+    @Override
+    public void assignRoleToUser(Long userId, String roleName) {
+        log.info("Attempting to assign role '{}' to user with ID: {}", roleName, userId);
+        User user = userRepository.findById(userId).orElseThrow(() -> new UserNotFoundException("User not found with ID: " + userId));
+        Role newRole;
+        try {
+            newRole = Role.valueOf(roleName);
+        } catch (IllegalArgumentException e) {
+            log.warn("Role assignment failed: Invalid role name '{}'.", roleName);
+            throw new IllegalArgumentException("Invalid role name: " + roleName);
+        }
+        user.setRole(newRole);
+        userRepository.save(user);
+        log.info("Role '{}' assigned to user with ID: {} successfully.", roleName, userId);
+    }
+
+    @Override
+    public void removeRoleFromUser(Long userId, String roleName) {
+        log.info("Removing role '{}' from user with ID: {}", roleName, userId);
+        User user = userRepository.findById(userId).orElseThrow(() -> new UserNotFoundException("User not found with ID: " + userId));
+        Role roleToRemove;
+        try {
+            roleToRemove = Role.valueOf(roleName);
+        } catch (IllegalArgumentException e) {
+            log.warn("Role removal failed: Invalid role name '{}'.", roleName);
+            throw new IllegalArgumentException("Invalid role name: " + roleName);
+        }
+        if (user.getRole() == roleToRemove) {
+            user.setRole(Role.USER); // Default to USER role if the current role is being removed
+            userRepository.save(user);
+            log.info("Role '{}' removed from user with ID: {}. Defaulted to USER role.", roleName, userId);
+        } else {
+            log.info("User with ID: {} does not have role '{}'. No changes made.", userId, roleName);
+        }
+        log.info("User with ID: {} has been removed successfully.", userId);
+    }
+
+    @Override
+    public List<UserResponse> getUsersByRole(String roleName) {
+        log.info("Fetching users with role: {}", roleName);
+        Role role;
+        try {
+            role = Role.valueOf(roleName);
+        } catch (IllegalArgumentException e) {
+            log.warn("Fetching users by role failed: Invalid role name '{}'.", roleName);
+            throw new IllegalArgumentException("Invalid role name: " + roleName);
+        }
+        log.info("Fetching users by role: {}", role);
+
+        return userRepository.findByRole(role).stream()
+                .map(userMapper::toUserResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public void deactivateUser(Long id) {
+        log.info("Deactivating user with ID: {}", id);
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new UserNotFoundException("User not found with ID: " + id));
+        user.setRole(Role.USER);
+        userRepository.save(user);
+        log.info("User with ID: {} has been deactivated.", id);
+    }
+
+    @Override
+    public void reactivateUser(Long id) {
+        log.info("Reactivating user with ID: {}", id);
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new UserNotFoundException("User not found with ID: " + id));
+        user.setActive(true);
+        userRepository.save(user);
+        log.info("User with ID: {} has been reactivated.", id);
+    }
+
+      // Advanced Search & Reporting methods
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<UserResponse> searchUsers(String query) {
+        log.info("Fetching users with query: {}", query);
+
+        return userRepository.searchByFirstNameLastNameOrEmail(query).stream()
+                .map(userMapper::toUserResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<UserResponse> getInactiveUsers() {
+        log.info("Fetching inactive users");
+        // Assuming inactive users are those who are not active
+        List<User> inactiveUsers = userRepository.findByIsActive(false);
+        if (!inactiveUsers.isEmpty()) {
+            return userMapper.toUserResponseList(inactiveUsers);
+        }
+        log.info("No inactive users found in the database.");
+        return List.of();
+    }
+
+    @Override
+    public List<UserResponse> getUsersRegisteredBetween(LocalDate startDate, LocalDate endDate) {
+        LocalDateTime startDateTime = startDate.atStartOfDay();
+        LocalDateTime endDateTime = endDate.plusDays(1).atStartOfDay();
+        log.info("Fetching users between {} and {}", startDate, endDate);
+        return userRepository.findByCreatedAtBetween(startDateTime, endDateTime).stream()
+                .map(userMapper::toUserResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<UserResponse> getUsersLastActiveBefore(LocalDateTime dateTime) {
+        log.info("Fetching users last active before {}", dateTime);
+        return userRepository.findByLastLoginBefore(dateTime).stream()
+                .map(userMapper::toUserResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public void purgeInactiveUsers(int months) {
+        log.info("Purging inactive users older than {} months", months);
+        LocalDateTime cutoff = LocalDateTime.now().minusMonths(months);
+        log.warn("Purging users older than {} months", cutoff);
+        userRepository.deleteUnverifiedUsersBefore(cutoff);
+        log.info("Purge of inactive users completed.");
+    }
+
+    @Override
+    public void purgeUnverifiedUsers(int hours) {
+        log.info("Purging unverified users older than {} hours", hours);
+        LocalDateTime cutoff = LocalDateTime.now().minusHours(hours);
+        log.warn("Purging users older than {} hours", cutoff);
+        userRepository.deleteUnverifiedUsersBefore(cutoff);
+        log.info("Purge of unverified users completed.");
+    }
+
+    @Override
+    public void resendVerificationEmail(String email) {
+        log.info("Attempting to resend verification email to {}", email);
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UserNotFoundException("User not found with email: " + email));
+
+        if (user.isEmailVerified()) {
+            log.info("User with email {} is already verified. No email sent.", email);
+            return;
+        }
+
+        // Generate a new token and send the email
+        String tokenValue = UUID.randomUUID().toString();
+        VerificationToken verificationToken = VerificationToken.builder()
+                .token(tokenValue)
+                .user(user)
+                .type(VerificationToken.TokenType.EMAIL_VERIFICATION)
+                .expiryDate(Instant.now().plusSeconds(86400)) // 24 hours
+                .build();
+        verificationTokenRepository.save(verificationToken);
+
+        emailService.sendVerificationEmail(user.getEmail(), tokenValue);
+        log.info("Successfully resent verification email to {}", email);
+    }
+
+    @Override
+    public void updateUserEmail(Long userId, String newEmail) {
+        log.info("Updating email for user ID: {} to new email: {}", userId, newEmail);
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException("User not found with ID: " + userId));
+        if (userRepository.findByEmail(newEmail).isPresent()) {
+            log.warn("Email update failed: Email {} is already taken.", newEmail);
+            throw new EmailAlreadyExistsException("Error: Email '" + newEmail + "' is already in use!");
+        } else {
+            user.setEmail(newEmail);
+            user.setEmailVerified(false); // Require re-verification for new email
+            userRepository.save(user);
+            log.info("User email updated successfully to {}. Verification required.", newEmail);
+
+            // Generate and send a new verification email
+            String tokenValue = UUID.randomUUID().toString();
+            VerificationToken verificationToken = VerificationToken.builder()
+                    .token(tokenValue)
+                    .user(user)
+                    .type(VerificationToken.TokenType.EMAIL_VERIFICATION)
+                    .expiryDate(Instant.now().plusSeconds(86400)) // 24 hours
+                    .build();
+            verificationTokenRepository.save(verificationToken);
+            emailService.sendVerificationEmail(newEmail, tokenValue);
+            log.info("Verification email sent to new address: {}", newEmail);
+        }
+    }
+
+    @Override
+    public void updateUserLastActive(String email) {
+        log.info("Updating last active email for user ID: {}", email);
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UserNotFoundException("User not found with email: " + email));
+        userRepository.updateLastLogin(user.getUserId(), LocalDateTime.now());
+        log.info("User last active time updated successfully for email: {}", email);
+    }
+
+    // Login Attempt Tracking (Security) methods
+
+    @Override
+    public void recordLoginAttempt(String email, boolean successful) {
+        // This is a stub implementation. You would typically save this to a database.
+        log.info("Attempting to record login attempt for user ID: {}", email);
+        log.info("Login attempt for user {} was {}", email, successful ? "successful" : "unsuccessful");
+    }
+
+    @Override
+    public List<LoginAttemptResponse> getLoginAttempts(String email) {
+        log.info("Fetching login attempts for user ID: {}", email);
+        // This is a stub implementation. You would typically fetch this from a database.
+
+        return List.of();
+    }
 }

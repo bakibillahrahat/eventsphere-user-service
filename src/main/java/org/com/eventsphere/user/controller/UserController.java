@@ -3,6 +3,7 @@ package org.com.eventsphere.user.controller;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.com.eventsphere.user.dto.ChangePasswordRequest;
+import org.com.eventsphere.user.dto.RoleAssignmentRequest;
 import org.com.eventsphere.user.dto.UserProfileUpdateRequest;
 import org.com.eventsphere.user.dto.UserResponse;
 import org.com.eventsphere.user.service.UserService;
@@ -82,5 +83,19 @@ public class UserController {
         userService.deleteUser(id);
         return ResponseEntity.ok("User with ID " + id + " has been deleted successfully.");
     }
+
+    // Additional endpoints for admin functionalities can be added here
+    @PostMapping("/assign-role")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<String> assignRole(@Valid @RequestBody RoleAssignmentRequest request) {
+        log.info("Admin request received to assign role '{}' to user ID '{}'", request.getRoleName(), request.getUserId());
+
+        userService.assignRoleToUser(request.getUserId(), request.getRoleName());
+
+        String successMessage = String.format("Role '%s' successfully assigned to user with ID '%d'.", request.getRoleName(), request.getUserId());
+        return ResponseEntity.ok(successMessage);
+    }
+
+
 
 }
