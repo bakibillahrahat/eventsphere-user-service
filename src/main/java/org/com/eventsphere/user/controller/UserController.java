@@ -35,7 +35,7 @@ public class UserController {
      *
      * @return A ResponseEntity containing a list of UserResponse DTOs and HTTP status 200 (OK).
      */
-    @GetMapping
+    @GetMapping("/all")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<UserResponse>> getAllUsers() {
         log.info("Getting all users.");
@@ -59,7 +59,7 @@ public class UserController {
         return ResponseEntity.ok(userResponse);
     }
 
-    @PutMapping("/{id}")
+    @PutMapping("/update/{id}")
     @PreAuthorize("hasRole('ADMIN') or #id == @userSecurity.getUserId(principal)")
     public ResponseEntity<UserResponse> updateUserProfile(@PathVariable Long id, @RequestBody UserProfileUpdateRequest request){
         log.info("Received request to update user profile: {}", request);
@@ -75,7 +75,7 @@ public class UserController {
     }
 
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/delete/{id}")
     @PreAuthorize("hasRole('ADMIN') or #id == @userSecurity.getUserId(principal)")
     public ResponseEntity<String> deleteUser(@PathVariable Long id) {
         log.info("Received request to delete user profile: {}", id);
